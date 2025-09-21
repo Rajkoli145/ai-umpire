@@ -5,18 +5,26 @@ const path = require('path');
 
 class UmpireAgent {
   constructor() {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY environment variable is required');
+    this.apiKeyConfigured = !!process.env.GEMINI_API_KEY;
+    
+    if (!this.apiKeyConfigured) {
+      console.warn('⚠️ GEMINI_API_KEY not configured - running in demo mode');
+      this.genAI = null;
+      this.visionModel = null;
+      this.videoModel = null;
+      this.multimodalModel = null;
+      this.liveModel = null;
+    } else {
+      this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      
+      // Initialize ALL 4 Gemini models for different purposes
+      this.visionModel = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });     // 1. Vision API - Frame analysis
+      this.videoModel = this.genAI.getGenerativeModel({ model: "gemini-1.5-pro" });       // 2. Video API - Complete video
+      this.multimodalModel = this.genAI.getGenerativeModel({ model: "gemini-1.5-pro" });  // 3. Multimodal API - Rules + Video
+      this.liveModel = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });      // 4. Live API - Final decision
     }
     
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     this.videoProcessor = new VideoProcessor();
-    
-    // Initialize ALL 4 Gemini models for different purposes
-    this.visionModel = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });     // 1. Vision API - Frame analysis
-    this.videoModel = this.genAI.getGenerativeModel({ model: "gemini-1.5-pro" });       // 2. Video API - Complete video
-    this.multimodalModel = this.genAI.getGenerativeModel({ model: "gemini-1.5-pro" });  // 3. Multimodal API - Rules + Video
-    this.liveModel = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });      // 4. Live API - Final decision
     
     // Add consistency cache
     this.analysisCache = new Map();
@@ -63,6 +71,12 @@ class UmpireAgent {
    */
   async processVideo(videoPath, sport = 'general') {
     console.log(`🏟️ Starting AI Umpire analysis for ${sport}...`);
+    
+    // Check if API is configured
+    if (!this.apiKeyConfigured) {
+      console.log('🎭 Running in demo mode - returning mock decision');
+      return this.generateDemoDecision(videoPath, sport);
+    }
     
     // Create cache key for consistency
     const cacheKey = `${path.basename(videoPath)}_${sport}`;
@@ -443,6 +457,68 @@ This is your FINAL OFFICIAL UMPIRE CALL for a live cricket match.
     }
 
     return 'DECISION REQUIRED'; // fallback
+  }
+
+  /**
+   * Generate a demo decision when API keys are not configured
+   * @param {string} videoPath - Path to the video file
+   * @param {string} sport - Sport type
+   * @returns {Object} Demo decision
+   */
+  async generateDemoDecision(videoPath, sport) {
+    console.log('🎭 Generating demo decision...');
+    
+    try {
+      // Get basic video metadata
+      const metadata = await this.videoProcessor.getVideoMetadata(videoPath);
+      
+      const demoDecisions = {
+        cricket: {
+          decision: 'OUT',
+          reasoning: 'Demo Mode: Based on simulated analysis, the batsman appears to be caught behind. Clear deflection visible.',
+          confidence: 'High',
+          finalCall: 'OUT'
+        },
+        football: {
+          decision: 'GOAL',
+          reasoning: 'Demo Mode: Ball crossed the goal line completely before being cleared.',
+          confidence: 'High',
+          finalCall: 'GOAL'
+        },
+        general: {
+          decision: 'VALID',
+          reasoning: 'Demo Mode: Action appears to be within the rules based on visual analysis.',
+          confidence: 'Medium',
+          finalCall: 'VALID'
+        }
+      };
+      
+      const selectedDecision = demoDecisions[sport] || demoDecisions.general;
+      
+      return {
+        timestamp: new Date().toISOString(),
+        sport: sport,
+        videoDuration: metadata.duration,
+        decision: `🎭 DEMO MODE ACTIVE 🎭\n\n⚠️ This is a demonstration response. To get real AI analysis:\n1. Get your Gemini API key from https://makersuite.google.com/app/apikey\n2. Set GEMINI_API_KEY environment variable\n3. Restart the application\n\n📋 Demo Decision: ${selectedDecision.decision}\n🎯 Demo Reasoning: ${selectedDecision.reasoning}`,
+        processedAsFullVideo: false,
+        hasAudio: metadata.hasAudio,
+        confidence: selectedDecision.confidence,
+        finalCall: selectedDecision.finalCall,
+        demoMode: true,
+        apiConfigured: false
+      };
+      
+    } catch (error) {
+      console.error('Demo decision generation error:', error);
+      return {
+        timestamp: new Date().toISOString(),
+        sport: sport,
+        decision: '🎭 DEMO MODE: Unable to process video. Please configure GEMINI_API_KEY environment variable.',
+        error: error.message,
+        demoMode: true,
+        apiConfigured: false
+      };
+    }
   }
 
   /**

@@ -94,10 +94,15 @@ app.post('/api/upload-video', upload.single('video'), async (req, res) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  const geminiConfigured = !!process.env.GEMINI_API_KEY;
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    geminiConfigured: !!process.env.GEMINI_API_KEY
+    geminiConfigured: geminiConfigured,
+    mode: geminiConfigured ? 'production' : 'demo',
+    message: geminiConfigured 
+      ? 'AI Umpire ready with Gemini API' 
+      : 'Running in demo mode - configure GEMINI_API_KEY for full functionality'
   });
 });
 
