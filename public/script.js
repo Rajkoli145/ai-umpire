@@ -266,13 +266,160 @@ class UmpireUI {
             const health = await response.json();
             
             if (!health.geminiConfigured) {
-                console.warn('Warning: Gemini API key not configured');
-                this.showError('Server is not properly configured. Please check the API key configuration.');
+                console.info('🎭 Running in demo mode - Gemini API key not configured');
+                this.showDemoModeNotification(health);
+                this.addModeIndicator('demo');
+            } else {
+                console.info('✅ AI Umpire ready with full Gemini API functionality');
+                this.addModeIndicator('ai');
             }
         } catch (error) {
             console.error('Health check failed:', error);
             this.showError('Unable to connect to the server. Please check if the server is running.');
         }
+    }
+
+    showDemoModeNotification(health) {
+        // Create a non-intrusive notification for demo mode
+        const notification = document.createElement('div');
+        notification.className = 'demo-notification';
+        notification.innerHTML = `
+            <div class="demo-content">
+                <span class="demo-icon">🎭</span>
+                <span class="demo-text">${health.message || 'Running in demo mode'}</span>
+                <button class="demo-close" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        `;
+        
+        // Add styles if not already present
+        if (!document.getElementById('demo-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'demo-styles';
+            styles.textContent = `
+                .demo-notification {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 12px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 1000;
+                    max-width: 350px;
+                    font-size: 14px;
+                    animation: slideIn 0.3s ease-out;
+                }
+                .demo-content {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+                .demo-icon {
+                    font-size: 18px;
+                }
+                .demo-text {
+                    flex: 1;
+                }
+                .demo-close {
+                    background: none;
+                    border: none;
+                    color: white;
+                    font-size: 18px;
+                    cursor: pointer;
+                    padding: 0;
+                    width: 20px;
+                    height: 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .demo-close:hover {
+                    opacity: 0.7;
+                }
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 8 seconds
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 8000);
+    }
+
+    addModeIndicator(mode) {
+        // Add a subtle mode indicator to the header
+        const header = document.querySelector('header');
+        if (!header) return;
+
+        // Remove existing indicator
+        const existingIndicator = document.getElementById('mode-indicator');
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+
+        const indicator = document.createElement('div');
+        indicator.id = 'mode-indicator';
+        
+        if (mode === 'demo') {
+            indicator.innerHTML = `
+                <span class="mode-badge demo-mode">
+                    <i class="fas fa-theater-masks"></i> Demo Mode
+                </span>
+            `;
+        } else {
+            indicator.innerHTML = `
+                <span class="mode-badge ai-mode">
+                    <i class="fas fa-robot"></i> AI Powered
+                </span>
+            `;
+        }
+
+        // Add styles for mode indicator
+        if (!document.getElementById('mode-indicator-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'mode-indicator-styles';
+            styles.textContent = `
+                #mode-indicator {
+                    position: absolute;
+                    top: 20px;
+                    right: 20px;
+                }
+                .mode-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 6px 12px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .demo-mode {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                }
+                .ai-mode {
+                    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+                    color: white;
+                }
+                header {
+                    position: relative;
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+
+        header.appendChild(indicator);
     }
 
     formatFileSize(bytes) {
